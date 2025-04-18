@@ -211,5 +211,7 @@ if uploaded_file:
 
         st.markdown("---")
         if st.button("🔄 Bắt đầu phiên kiểm tra mới"):
-            st.experimental_set_query_params()
+            for key in st.session_state.keys():
+                del st.session_state[key]
             st.rerun()
+
