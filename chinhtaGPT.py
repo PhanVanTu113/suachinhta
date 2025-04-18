@@ -58,7 +58,7 @@ st.markdown("""
 #### 📂 Hướng dẫn sử dụng:
 1. Tải lên tệp văn bản tiếng Việt cần kiểm tra lỗi chính tả (hỗ trợ định dạng `.txt`, `.docx`, `.pdf`).
 2. Hệ thống sẽ kiểm tra và hiển thị kết quả đã chỉnh sửa ngay bên dưới.
-3. Có thể tải kết quả về dưới dạng `.txt` hoặc `.docx` để lưu trữ.
+3. Có thể tải kết quả về dưới dạng `.txt`, `.docx` hoặc `.pdf` để lưu trữ.
 4. So sánh đoạn văn gốc và đoạn đã sửa để thấy rõ thay đổi.
 5. Có thể lựa chọn mô hình GPT-3.5 để tiết kiệm chi phí.
 ---
@@ -73,6 +73,7 @@ if uploaded_file:
         file_text = ""
         paragraphs = []
         doc = None
+        pdf_data = None
 
         if uploaded_file.type == "text/plain":
             file_text = uploaded_file.read().decode("utf-8", errors="ignore")
@@ -84,7 +85,8 @@ if uploaded_file:
                     paragraphs.append((para, text))
                     file_text += text + "\n"
         elif uploaded_file.type == "application/pdf":
-            pdf_doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+            pdf_data = uploaded_file.read()
+            pdf_doc = fitz.open(stream=pdf_data, filetype="pdf")
             for page in pdf_doc:
                 file_text += page.get_text()
 
@@ -168,6 +170,9 @@ if uploaded_file:
             doc.save(output)
             b64_docx = base64.b64encode(output.getvalue()).decode()
             st.markdown(f'<a class="download-btn" href="data:application/octet-stream;base64,{b64_docx}" download="ket_qua_da_sua.docx">📥 Tải file Word đã sửa</a>', unsafe_allow_html=True)
+        elif pdf_data:
+            b64_pdf = base64.b64encode(pdf_data).decode()
+            st.markdown(f'<a class="download-btn" href="data:application/pdf;base64,{b64_pdf}" download="ban_goc.pdf">📥 Tải lại file PDF gốc</a>', unsafe_allow_html=True)
         else:
             b64 = base64.b64encode(corrected_all.encode()).decode()
             href = f'<a class="download-btn" href="data:file/txt;base64,{b64}" download="ket_qua_da_sua.txt">📥 Tải kết quả về</a>'
@@ -176,4 +181,3 @@ if uploaded_file:
         st.markdown("---")
         if st.button("🔄 Bắt đầu phiên kiểm tra mới"):
             st.rerun()
-            
