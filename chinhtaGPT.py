@@ -202,8 +202,26 @@ if uploaded_file:
             b64_docx = base64.b64encode(output.getvalue()).decode()
             st.markdown(f'<a class="download-btn" href="data:application/octet-stream;base64,{b64_docx}" download="{filename}_da_sua.docx">📥 Tải file Word đã sửa</a>', unsafe_allow_html=True)
         elif pdf_data:
-            b64_pdf = base64.b64encode(pdf_data).decode()
-            st.markdown(f'<a class="download-btn" href="data:application/pdf;base64,{b64_pdf}" download="{filename}_goc.pdf">📥 Tải lại file PDF gốc</a>', unsafe_allow_html=True)
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            from PyPDF2 import PdfWriter, PdfReader
+            import tempfile
+
+            # Tạo PDF mới từ nội dung đã sửa
+            temp_pdf = BytesIO()
+            c = canvas.Canvas(temp_pdf, pagesize=letter)
+            textobject = c.beginText(40, 750)
+            for line in corrected_all.split("
+"):
+                textobject.textLine(line)
+            c.drawText(textobject)
+            c.save()
+
+            # Tạo file kết hợp nếu muốn ghép lại nền cũ + sửa mới (tuỳ chỉnh nâng cao)
+            # Còn không thì chỉ cần xuất file sửa
+            temp_pdf.seek(0)
+            b64_pdf_corrected = base64.b64encode(temp_pdf.read()).decode()
+            st.markdown(f'<a class="download-btn" href="data:application/pdf;base64,{b64_pdf_corrected}" download="{filename}_da_sua.pdf">📥 Tải file PDF đã sửa</a>', unsafe_allow_html=True)">📥 Tải lại file PDF gốc</a>', unsafe_allow_html=True)
         else:
             b64 = base64.b64encode(corrected_all.encode()).decode()
             href = f'<a class="download-btn" href="data:file/txt;base64,{b64}" download="{filename}_da_sua.txt">📥 Tải kết quả về</a>'
