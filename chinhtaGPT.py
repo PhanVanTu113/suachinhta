@@ -7,6 +7,7 @@ import base64
 import fitz  # PyMuPDF
 import textwrap
 from docx import Document
+from difflib import ndiff
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
@@ -35,6 +36,9 @@ st.markdown("""
     background-color: #f9f9f9;
     white-space: pre-wrap;
     font-family: monospace;
+}
+.changed {
+    background-color: #ffffcc;
 }
 .download-btn {
     margin-top: 1rem;
@@ -92,9 +96,23 @@ if uploaded_file:
             return paragraphs
 
         corrected_all = ""
+        original_all = ""
         total_tokens = 0
 
+        def highlight_diff(original, corrected):
+            diff = ndiff(original.split(), corrected.split())
+            highlighted = []
+            for word in diff:
+                if word.startswith('+'):
+                    highlighted.append(f"<span class='changed'>{word[2:]}</span>")
+                elif word.startswith('-'):
+                    continue
+                elif word.startswith(' '):
+                    highlighted.append(word[2:])
+            return ' '.join(highlighted)
+
         if doc and paragraphs:
+            highlighted_output = []
             for para, text in paragraphs:
                 res = client.chat.completions.create(
                     model=model,
@@ -108,10 +126,13 @@ if uploaded_file:
                 corrected = res.choices[0].message.content.strip()
                 para.text = corrected
                 corrected_all += corrected + "\n"
+                original_all += text + "\n"
                 if hasattr(res, "usage"):
                     total_tokens += res.usage.total_tokens
+                highlighted_output.append(highlighted_diff(text, corrected))
         else:
             chunks = chunk_text(file_text)
+            highlighted_output = []
             for chunk in chunks:
                 res = client.chat.completions.create(
                     model=model,
@@ -122,18 +143,21 @@ if uploaded_file:
                     temperature=0.3,
                     max_tokens=1024
                 )
-                corrected_all += res.choices[0].message.content + "\n"
+                corrected = res.choices[0].message.content.strip()
+                corrected_all += corrected + "\n"
+                original_all += chunk + "\n"
                 if hasattr(res, "usage"):
                     total_tokens += res.usage.total_tokens
+                highlighted_output.append(highlighted_diff(chunk, corrected))
 
         st.subheader("📝 So sánh văn bản trước và sau khi sửa lỗi")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**📄 Văn bản gốc:**")
-            st.text_area("", file_text[:5000], height=300)
+            st.text_area("", original_all[:5000], height=300)
         with col2:
-            st.markdown("**✅ Đã sửa lỗi:**")
-            st.markdown(f"<div class='result-box'>{corrected_all}</div>", unsafe_allow_html=True)
+            st.markdown("**✅ Đã sửa lỗi (bôi vàng chỗ thay đổi):**")
+            st.markdown(f"<div class='result-box'>{'<br>'.join(highlighted_output)}</div>", unsafe_allow_html=True)
 
         if total_tokens > 0:
             st.info(f"🔢 Token đã sử dụng: {total_tokens} (ước tính chi phí ~{total_tokens / 1000 * 0.01:.4f} USD nếu dùng GPT-3.5)")
