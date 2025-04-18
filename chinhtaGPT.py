@@ -59,7 +59,8 @@ st.markdown("""
 1. Tải lên tệp văn bản tiếng Việt cần kiểm tra lỗi chính tả (hỗ trợ định dạng `.txt`, `.docx`, `.pdf`).
 2. Hệ thống sẽ kiểm tra và hiển thị kết quả đã chỉnh sửa ngay bên dưới.
 3. Có thể tải kết quả về dưới dạng `.txt` hoặc `.docx` để lưu trữ.
-
+4. So sánh đoạn văn gốc và đoạn đã sửa để thấy rõ thay đổi.
+5. Có thể lựa chọn mô hình GPT-3.5 để tiết kiệm chi phí.
 ---
 """)
 
@@ -129,7 +130,7 @@ if uploaded_file:
                 original_all += text + "\n"
                 if hasattr(res, "usage"):
                     total_tokens += res.usage.total_tokens
-                highlighted_output.append(highlighted_diff(text, corrected))
+                highlighted_output.append(highlight_diff(text, corrected))
         else:
             chunks = chunk_text(file_text)
             highlighted_output = []
@@ -148,7 +149,7 @@ if uploaded_file:
                 original_all += chunk + "\n"
                 if hasattr(res, "usage"):
                     total_tokens += res.usage.total_tokens
-                highlighted_output.append(highlighted_diff(chunk, corrected))
+                highlighted_output.append(highlight_diff(chunk, corrected))
 
         st.subheader("📝 So sánh văn bản trước và sau khi sửa lỗi")
         col1, col2 = st.columns(2)
@@ -160,7 +161,7 @@ if uploaded_file:
             st.markdown(f"<div class='result-box'>{'<br>'.join(highlighted_output)}</div>", unsafe_allow_html=True)
 
         if total_tokens > 0:
-            st.info(f"🔢 Token đã sử dụng: {total_tokens} (ước tính chi phí ~{total_tokens / 1000 * 0.01:.4f} USD nếu dùng GPT-3.5)")
+            st.info(f"🔢 Token đã sử dụng: {total_tokens} (ước tính chi phí ~{total_tokens / 1000 * (0.01 if model == 'gpt-3.5-turbo' else 0.03):.4f} USD)")
 
         if doc:
             output = BytesIO()
