@@ -172,3 +172,7 @@ if uploaded_file:
             b64 = base64.b64encode(corrected_all.encode()).decode()
             href = f'<a class="download-btn" href="data:file/txt;base64,{b64}" download="ket_qua_da_sua.txt">📥 Tải kết quả về</a>'
             st.markdown(href, unsafe_allow_html=True)
+
+        st.markdown("---")
+        if st.button("🔄 Bắt đầu phiên kiểm tra mới"):
+            st.experimental_rerun()
