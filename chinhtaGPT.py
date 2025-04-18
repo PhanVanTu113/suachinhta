@@ -230,4 +230,4 @@ if uploaded_file:
             for key in keys_to_clear:
                 del st.session_state[key]
             st.session_state["model"] = preserved_model
-            st.experimental_rerun()
+            st.rerun()
