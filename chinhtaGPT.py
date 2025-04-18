@@ -76,7 +76,7 @@ if uploaded_file:
         doc = None
         pdf_data = None
         filename = uploaded_file.name.rsplit('.', 1)[0]
-        
+
         if uploaded_file.type == "text/plain":
             file_text = uploaded_file.read().decode("utf-8", errors="ignore")
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -211,7 +211,9 @@ if uploaded_file:
 
         st.markdown("---")
         if st.button("🔄 Bắt đầu phiên kiểm tra mới"):
-            for key in st.session_state.keys():
+            preserved_model = st.session_state.get("model", "gpt-4o")
+            keys_to_clear = list(st.session_state.keys())
+            for key in keys_to_clear:
                 del st.session_state[key]
-            st.rerun()
-
+            st.session_state["model"] = preserved_model
+            st.experimental_rerun()
