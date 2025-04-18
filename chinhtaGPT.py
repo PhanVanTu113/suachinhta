@@ -175,4 +175,5 @@ if uploaded_file:
 
         st.markdown("---")
         if st.button("🔄 Bắt đầu phiên kiểm tra mới"):
-            st.experimental_rerun()
+            st.rerun()
+            
