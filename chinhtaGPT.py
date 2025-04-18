@@ -2,11 +2,11 @@
 import streamlit as st
 import os
 from openai import OpenAI
-from io import StringIO
+from io import BytesIO
 import base64
-import docx2txt
 import fitz  # PyMuPDF
 import textwrap
+from docx import Document
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
@@ -54,7 +54,7 @@ st.markdown("""
 #### 📂 Hướng dẫn sử dụng:
 1. Tải lên tệp văn bản tiếng Việt cần kiểm tra lỗi chính tả (hỗ trợ định dạng `.txt`, `.docx`, `.pdf`).
 2. Hệ thống sẽ kiểm tra và hiển thị kết quả đã chỉnh sửa ngay bên dưới.
-3. Có thể tải kết quả về dưới dạng `.txt` để lưu trữ.
+3. Có thể tải kết quả về dưới dạng `.txt` hoặc `.docx` để lưu trữ.
 
 ---
 """)
@@ -66,10 +66,18 @@ uploaded_file = st.file_uploader("📄 Tải lên tệp cần kiểm tra chính 
 if uploaded_file:
     with st.spinner("📑 Đang xử lý tệp..."):
         file_text = ""
+        paragraphs = []
+        doc = None
+
         if uploaded_file.type == "text/plain":
             file_text = uploaded_file.read().decode("utf-8", errors="ignore")
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            file_text = docx2txt.process(uploaded_file)
+            doc = Document(uploaded_file)
+            for para in doc.paragraphs:
+                text = para.text.strip()
+                if text:
+                    paragraphs.append((para, text))
+                    file_text += text + "\n"
         elif uploaded_file.type == "application/pdf":
             pdf_doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             for page in pdf_doc:
@@ -79,30 +87,45 @@ if uploaded_file:
             st.warning("📭 Không thể đọc được nội dung từ tệp đã tải lên.")
             st.stop()
 
-        # Tách văn bản thành các đoạn nhỏ <= 3000 ký tự
         def chunk_text(text, max_length=3000):
             paragraphs = textwrap.wrap(text, width=max_length, break_long_words=False, replace_whitespace=False)
             return paragraphs
 
-        chunks = chunk_text(file_text)
         corrected_all = ""
         total_tokens = 0
 
-        for i, chunk in enumerate(chunks):
-            res = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "Bạn là một chuyên gia ngôn ngữ tiếng Việt. Hãy giúp tôi kiểm tra và sửa lỗi chính tả, lỗi đánh máy và lỗi ngữ pháp trong đoạn văn sau."},
-                    {"role": "user", "content": chunk}
-                ],
-                temperature=0.3,
-                max_tokens=1024
-            )
-            corrected_all += res.choices[0].message.content + "\n"
-            if hasattr(res, "usage"):
-                total_tokens += res.usage.total_tokens
+        if doc and paragraphs:
+            for para, text in paragraphs:
+                res = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "Bạn là một chuyên gia ngôn ngữ tiếng Việt. Hãy sửa lỗi chính tả trong đoạn văn sau."},
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.3,
+                    max_tokens=1024
+                )
+                corrected = res.choices[0].message.content.strip()
+                para.text = corrected
+                corrected_all += corrected + "\n"
+                if hasattr(res, "usage"):
+                    total_tokens += res.usage.total_tokens
+        else:
+            chunks = chunk_text(file_text)
+            for chunk in chunks:
+                res = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "Bạn là một chuyên gia ngôn ngữ tiếng Việt. Hãy sửa lỗi chính tả trong đoạn văn sau."},
+                        {"role": "user", "content": chunk}
+                    ],
+                    temperature=0.3,
+                    max_tokens=1024
+                )
+                corrected_all += res.choices[0].message.content + "\n"
+                if hasattr(res, "usage"):
+                    total_tokens += res.usage.total_tokens
 
-        # Hiển thị kết quả
         st.subheader("📝 So sánh văn bản trước và sau khi sửa lỗi")
         col1, col2 = st.columns(2)
         with col1:
@@ -115,7 +138,12 @@ if uploaded_file:
         if total_tokens > 0:
             st.info(f"🔢 Token đã sử dụng: {total_tokens} (ước tính chi phí ~{total_tokens / 1000 * 0.01:.4f} USD nếu dùng GPT-3.5)")
 
-        # Tải kết quả
-        b64 = base64.b64encode(corrected_all.encode()).decode()
-        href = f'<a class="download-btn" href="data:file/txt;base64,{b64}" download="ket_qua_da_sua.txt">📥 Tải kết quả về</a>'
-        st.markdown(href, unsafe_allow_html=True)
+        if doc:
+            output = BytesIO()
+            doc.save(output)
+            b64_docx = base64.b64encode(output.getvalue()).decode()
+            st.markdown(f'<a class="download-btn" href="data:application/octet-stream;base64,{b64_docx}" download="ket_qua_da_sua.docx">📥 Tải file Word đã sửa</a>', unsafe_allow_html=True)
+        else:
+            b64 = base64.b64encode(corrected_all.encode()).decode()
+            href = f'<a class="download-btn" href="data:file/txt;base64,{b64}" download="ket_qua_da_sua.txt">📥 Tải kết quả về</a>'
+            st.markdown(href, unsafe_allow_html=True)
